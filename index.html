@@ -1060,51 +1060,47 @@
         }
         .inbox-badge.hide { display: none; }
 
-        /* 右上角消息图标 */
+        /* 消息图标（标题下方） */
         .msg-icon {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            width: 48px;
-            height: 48px;
-            background: rgba(255,255,255,0.25);
-            border: 2px solid rgba(255,255,255,0.6);
-            border-radius: 50%;
             display: none;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            gap: 5px;
+            margin: 0 auto 18px;
+            padding: 6px 18px;
+            background: rgba(255,255,255,0.25);
+            border: 1.5px solid rgba(255,255,255,0.5);
+            border-radius: 20px;
+            font-size: 14px;
+            color: white;
             cursor: pointer;
-            z-index: 999;
             backdrop-filter: blur(8px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            box-shadow: 0 3px 12px rgba(0,0,0,0.1);
             transition: all 0.3s ease;
+            position: relative;
+            width: fit-content;
         }
         .msg-icon:hover {
             background: rgba(255,255,255,0.4);
-            transform: scale(1.1);
+            transform: scale(1.05);
         }
+        .msg-icon .msg-emoji { font-size: 16px; }
+        .msg-icon .msg-text { font-size: 13px; }
         .msg-icon .msg-badge {
-            position: absolute;
-            top: -4px;
-            right: -4px;
-            min-width: 20px;
-            height: 20px;
-            line-height: 20px;
+            min-width: 18px;
+            height: 18px;
+            line-height: 18px;
             padding: 0 5px;
             background: #ff4757;
             color: white;
-            border-radius: 10px;
+            border-radius: 9px;
             font-size: 11px;
             font-weight: bold;
             text-align: center;
-            border: 2px solid rgba(255,71,87,0.3);
             display: none;
         }
-        .msg-icon .msg-badge.show { display: block; }
-        .msg-icon .msg-badge.pop {
-            animation: msgPop 0.5s ease;
-        }
+        .msg-icon .msg-badge.show { display: inline-block; }
+        .msg-icon .msg-badge.pop { animation: msgPop 0.5s ease; }
         @keyframes msgPop {
             0% { transform: scale(0); }
             50% { transform: scale(1.4); }
@@ -1114,13 +1110,14 @@
         /* 新消息提示弹窗 */
         .msg-toast {
             position: fixed;
-            top: 75px;
-            right: 20px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             width: 300px;
             max-width: 90vw;
             background: white;
             border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
             padding: 15px 18px;
             z-index: 1000;
             display: none;
@@ -1515,11 +1512,12 @@
     <!-- 固定右上角退出按钮 -->
     <button class="logout-fixed" id="logoutFixed" onclick="logout()">退出登录</button>
 
-    <!-- 欢迎页面 -->
-    <div class="welcome-page" id="welcomePage">
-        <h1 class="welcome-title">米奇妙妙屋</h1>
-        <p class="welcome-role" id="welcomeRole"></p>
-        <p class="welcome-msg" id="welcomeMsg"></p>
+    <!-- 新消息提示弹窗 -->
+    <div class="msg-toast" id="msgToast">
+        <span class="mt-close" onclick="closeMsgToast()">×</span>
+        <div class="mt-header">📬 新消息提醒</div>
+        <div class="mt-content" id="msgToastContent"></div>
+    </div>
         <!-- 分页导航 -->
         <div class="page-tabs">
             <div class="page-tab active" id="tab1" onclick="switchPage(1)">第一页</div>
