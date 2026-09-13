@@ -2039,7 +2039,7 @@
                     time: timeStr,
                     read: false
                 });
-                cloudSetReminders(tuser, list);
+                cloudData.reminders[tuser] = list;
             }
             saveCloudData().then(function() {
                 document.getElementById('inviteDate').value = '';
@@ -2853,7 +2853,7 @@
             var senderAccount = accounts[currentUser];
             var senderRole = senderAccount ? senderAccount.role : '未知';
             var catNames = {home:'在家吃', meat:'开荤', out:'下馆子！', trip:'异地微度假', local:'就在遂宁'};
-            var catLabel = (catPrefix === 'food' && currentCat) ? catNames[currentCat] : '';
+            var catLabel = currentCat ? (catNames[currentCat] || '') : '';
             var now = new Date();
             var timeStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2,'0') + '-' + now.getDate().toString().padStart(2,'0') + ' ' + now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
             var reminder = {
@@ -2867,7 +2867,7 @@
                 time: timeStr,
                 read: false
             };
-            // 给每个接收人存一条提醒
+            // 给每个接收人存一条提醒（先全部写入本地cloudData，再一次性保存）
             for (var i = 0; i < selectedReminderPeople.length; i++) {
                 var rkey = selectedReminderPeople[i];
                 var list = cloudGetReminders(rkey);
@@ -2881,16 +2881,19 @@
                     time: reminder.time,
                     read: false
                 });
-                cloudSetReminders(rkey, list);
+                cloudData.reminders[rkey] = list;
             }
-            el('reminderTip').textContent = '✓ 提醒已发送给 ' + selectedReminderPeople.length + ' 人！';
-            el('reminderTip').classList.add('show');
-            selectedReminderPeople = [];
-            renderReminderPeople();
-            setTimeout(function() {
-                el('reminderTip').classList.remove('show');
-            }, 3000);
-            updateInboxBadge();
+            // 一次性保存到云端
+            saveCloudData().then(function() {
+                el('reminderTip').textContent = '✓ 提醒已发送给 ' + selectedReminderPeople.length + ' 人！';
+                el('reminderTip').classList.add('show');
+                selectedReminderPeople = [];
+                renderReminderPeople();
+                setTimeout(function() {
+                    el('reminderTip').classList.remove('show');
+                }, 3000);
+                updateInboxBadge();
+            });
         }
 
         // 提醒收件箱
@@ -2938,7 +2941,8 @@
                     break;
                 }
             }
-            cloudSetReminders(currentUser, reminders).then(function() {
+            cloudData.reminders[currentUser] = reminders;
+            saveCloudData().then(function() {
                 renderInbox();
                 updateInboxBadge();
             });
