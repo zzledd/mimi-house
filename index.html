@@ -1501,7 +1501,6 @@
                 <!-- 添加菜谱 -->
                 <div class="recipe-add-area">
                     <input type="text" id="recipeName" placeholder="菜名，比如：红烧肉" />
-                    <textarea id="recipeContent" placeholder="做法/食材，比如：五花肉500g、酱油、冰糖..."></textarea>
                     <div class="recipe-cat-select">
                         <div class="recipe-cat-btn selected" onclick="selectRecipeCat(this,'家常菜')">家常菜</div>
                         <div class="recipe-cat-btn" onclick="selectRecipeCat(this,'硬菜')">硬菜</div>
@@ -1717,15 +1716,13 @@
 
         function addRecipe() {
             var name = document.getElementById('recipeName').value.trim();
-            var content = document.getElementById('recipeContent').value.trim();
             if (!name) { alert('请输入菜名~'); return; }
-            if (!content) { alert('请输入做法或食材~'); return; }
             var account = accounts[currentUser];
             var author = account ? account.role : '未知';
             var recipe = {
                 id: 'recipe_' + Date.now(),
                 name: name,
-                content: content,
+                content: '',
                 cat: currentRecipeCat,
                 author: author,
                 authorUser: currentUser,
@@ -1735,7 +1732,6 @@
             cloudData.recipes.unshift(recipe);
             saveCloudData().then(function() {
                 document.getElementById('recipeName').value = '';
-                document.getElementById('recipeContent').value = '';
                 renderRecipes();
             });
         }
@@ -1769,7 +1765,6 @@
                 item.className = 'recipe-item';
                 item.innerHTML =
                     '<div class="ri-header"><span class="ri-name">' + r.name + '</span><span class="ri-cat">' + r.cat + '</span></div>' +
-                    '<div class="ri-content">' + r.content + '</div>' +
                     '<div class="ri-footer"><span class="ri-author">' + r.author + ' · ' + r.time + '</span>' +
                     (canDelete ? '<span class="ri-delete" onclick="deleteRecipe(\'' + r.id + '\')">删除</span>' : '') + '</div>';
                 list.appendChild(item);
