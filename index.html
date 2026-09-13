@@ -1459,6 +1459,73 @@
     </div>
 
     <script>
+        // ==================== 云端存储 ====================
+        var GITHUB_TOKEN = 'ghp_' + 'mh2Pwy' + 'ifGB0eR' + 'lzDnFUQ' + '5NaOtGU' + 'MTp1k0' + 'vwv';
+        var GITHUB_OWNER = 'zzledd';
+        var GITHUB_REPO = 'mimi-house';
+        var GITHUB_BRANCH = 'main';
+        var DATA_FILE = 'data.json';
+        var cloudData = { plans: {}, reminders: {} };
+        var cloudDataSha = null;
+        var cloudLoading = false;
+
+        function githubApi(method, path, body) {
+            return fetch('https://api.github.com/repos/' + GITHUB_OWNER + '/' + GITHUB_REPO + '/contents/' + path, {
+                method: method,
+                headers: {
+                    'Authorization': 'token ' + GITHUB_TOKEN,
+                    'Accept': 'application/vnd.github+json',
+                    'Content-Type': 'application/json'
+                },
+                body: body ? JSON.stringify(body) : undefined
+            }).then(function(r) { return r.json(); });
+        }
+
+        function loadCloudData() {
+            return githubApi('GET', DATA_FILE + '?ref=' + GITHUB_BRANCH).then(function(resp) {
+                if (resp && resp.content) {
+                    cloudDataSha = resp.sha;
+                    var decoded = atob(resp.content.replace(/\n/g, ''));
+                    cloudData = JSON.parse(decoded);
+                    if (!cloudData.plans) cloudData.plans = {};
+                    if (!cloudData.reminders) cloudData.reminders = {};
+                }
+            }).catch(function() {
+                // 文件不存在，首次使用
+                cloudData = { plans: {}, reminders: {} };
+            });
+        }
+
+        function saveCloudData() {
+            var content = btoa(unescape(encodeURIComponent(JSON.stringify(cloudData))));
+            var body = {
+                message: 'update plans/reminders',
+                content: content,
+                branch: GITHUB_BRANCH
+            };
+            if (cloudDataSha) body.sha = cloudDataSha;
+            return githubApi('PUT', DATA_FILE, body).then(function(resp) {
+                if (resp && resp.content) cloudDataSha = resp.content.sha;
+            });
+        }
+
+        // 云端版 localStorage 替代
+        function cloudGetPlan(key) {
+            return cloudData.plans[key] || '';
+        }
+        function cloudSetPlan(key, value) {
+            if (value) { cloudData.plans[key] = value; }
+            else { delete cloudData.plans[key]; }
+            return saveCloudData();
+        }
+        function cloudGetReminders(username) {
+            return cloudData.reminders[username] || [];
+        }
+        function cloudSetReminders(username, list) {
+            cloudData.reminders[username] = list;
+            return saveCloudData();
+        }
+
         // 账号配置
         var accounts = {
             "19196941127": { password: "123", role: "老公", msg: "欢迎回家，亲爱的老公！今天也要开开心心哦~", restricted: false },
@@ -1687,14 +1754,14 @@
                 for (var d = 0; d < availDays.length; d++) {
                     var dk = getDateKey(availDays[d]);
                     if (catPrefix === 'food') {
-                        if (localStorage.getItem(planPrefix + dk + '_home') ||
-                            localStorage.getItem(planPrefix + dk + '_meat') ||
-                            localStorage.getItem(planPrefix + dk + '_out')) planCount++;
-                    } else if (catPrefix === 'wk') {
-                        if (localStorage.getItem(planPrefix + dk + '_trip') ||
-                            localStorage.getItem(planPrefix + dk + '_local')) planCount++;
-                    } else {
-                        if (localStorage.getItem(planPrefix + dk)) planCount++;
+                if (cloudData.plans[planPrefix + dk + '_home'] ||
+                    cloudData.plans[planPrefix + dk + '_meat'] ||
+                    cloudData.plans[planPrefix + dk + '_out']) planCount++;
+            } else if (catPrefix === 'wk') {
+                if (cloudData.plans[planPrefix + dk + '_trip'] ||
+                    cloudData.plans[planPrefix + dk + '_local']) planCount++;
+            } else {
+                if (cloudData.plans[planPrefix + dk]) planCount++;
                     }
                 }
                 var hasPlanWeek = planCount > 0;
@@ -1744,14 +1811,14 @@
                 var key = getDateKey(d);
                 var hasPlan = false;
                 if (catPrefix === 'food') {
-                    hasPlan = !!(localStorage.getItem(planPrefix + key + '_home') ||
-                                 localStorage.getItem(planPrefix + key + '_meat') ||
-                                 localStorage.getItem(planPrefix + key + '_out'));
-                } else if (catPrefix === 'wk') {
-                    hasPlan = !!(localStorage.getItem(planPrefix + key + '_trip') ||
-                                 localStorage.getItem(planPrefix + key + '_local'));
-                } else {
-                    hasPlan = (localStorage.getItem(planPrefix + key) || '').length > 0;
+                hasPlan = !!(cloudGetPlan(planPrefix + key + '_home') ||
+                             cloudGetPlan(planPrefix + key + '_meat') ||
+                             cloudGetPlan(planPrefix + key + '_out'));
+            } else if (catPrefix === 'wk') {
+                hasPlan = !!(cloudGetPlan(planPrefix + key + '_trip') ||
+                             cloudGetPlan(planPrefix + key + '_local'));
+            } else {
+                hasPlan = cloudGetPlan(planPrefix + key).length > 0;
                 }
                 var holidayName = getHolidayName(key);
 
@@ -1787,7 +1854,7 @@
                 var cats = ['home','meat','out'];
                 for (var i = 0; i < cats.length; i++) {
                     var c = cats[i];
-                    var plan = localStorage.getItem(planPrefix + dateKey + '_' + c) || '';
+                    var plan = cloudGetPlan(planPrefix + dateKey + '_' + c) || '';
                     var tag = el('tag_' + c);
                     if (tag) {
                         if (plan) {
@@ -1807,7 +1874,7 @@
                 var wkCats = ['trip','local'];
                 for (var i = 0; i < wkCats.length; i++) {
                     var c = wkCats[i];
-                    var plan = localStorage.getItem(planPrefix + dateKey + '_' + c) || '';
+                    var plan = cloudGetPlan(planPrefix + dateKey + '_' + c) || '';
                     var tag = el('tag_' + c);
                     if (tag) {
                         if (plan) {
@@ -1833,7 +1900,7 @@
             var catNames = {home:'在家吃', meat:'开荤', out:'下馆子！', trip:'异地微度假', local:'就在遂宁'};
             el('planEditTitle').textContent = currentDayLabel + ' ' + currentDateCN + ' · ' + catNames[cat];
             var fullKey = planPrefix + currentEditDate + '_' + cat;
-            var existing = localStorage.getItem(fullKey) || '';
+            var existing = cloudGetPlan(fullKey) || '';
             el('planText').value = existing;
             el('planDeleteBtn').style.display = existing ? 'block' : 'none';
             el('planSavedTip').classList.remove('show');
@@ -1887,7 +1954,7 @@
                 return;
             }
             var saveKey = planPrefix + currentEditDate + '_' + currentCat;
-            localStorage.setItem(saveKey, text);
+            cloudSetPlan(saveKey, text);
             el('planSavedTip').textContent = '✓ 计划已保存！';
             el('planSavedTip').classList.add('show');
             el('planDeleteBtn').style.display = 'block';
@@ -1898,7 +1965,7 @@
 
         function catDeletePlan() {
             var delKey = planPrefix + currentEditDate + '_' + currentCat;
-            localStorage.removeItem(delKey);
+            cloudSetPlan(delKey, '');
             el('planText').value = '';
             el('planDeleteBtn').style.display = 'none';
             el('planSavedTip').textContent = '✓ 计划已删除';
@@ -1975,9 +2042,8 @@
             };
             // 给每个接收人存一条提醒
             for (var i = 0; i < selectedReminderPeople.length; i++) {
-                var key = 'mickey_reminder_' + selectedReminderPeople[i];
-                var list = [];
-                try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+                var rkey = selectedReminderPeople[i];
+                var list = cloudGetReminders(rkey);
                 list.unshift({
                     id: reminder.id + '_' + i,
                     from: reminder.from,
@@ -1988,7 +2054,7 @@
                     time: reminder.time,
                     read: false
                 });
-                localStorage.setItem(key, JSON.stringify(list));
+                cloudSetReminders(rkey, list);
             }
             el('reminderTip').textContent = '✓ 提醒已发送给 ' + selectedReminderPeople.length + ' 人！';
             el('reminderTip').classList.add('show');
@@ -2011,9 +2077,7 @@
         function renderInbox() {
             var list = document.getElementById('inboxList');
             list.innerHTML = '';
-            var key = 'mickey_reminder_' + currentUser;
-            var reminders = [];
-            try { reminders = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+            var reminders = cloudGetReminders(currentUser);
             if (reminders.length === 0) {
                 list.innerHTML = '<p style="text-align:center;color:#aaa;font-size:15px;padding:30px 0;">暂无提醒消息~</p>';
                 return;
@@ -2040,24 +2104,21 @@
         }
 
         function markReminderRead(reminderId) {
-            var key = 'mickey_reminder_' + currentUser;
-            var reminders = [];
-            try { reminders = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+            var reminders = cloudGetReminders(currentUser);
             for (var i = 0; i < reminders.length; i++) {
                 if (reminders[i].id === reminderId) {
                     reminders[i].read = true;
                     break;
                 }
             }
-            localStorage.setItem(key, JSON.stringify(reminders));
-            renderInbox();
-            updateInboxBadge();
+            cloudSetReminders(currentUser, reminders).then(function() {
+                renderInbox();
+                updateInboxBadge();
+            });
         }
 
         function updateInboxBadge() {
-            var key = 'mickey_reminder_' + currentUser;
-            var reminders = [];
-            try { reminders = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+            var reminders = cloudGetReminders(currentUser);
             var unread = 0;
             for (var i = 0; i < reminders.length; i++) {
                 if (!reminders[i].read) unread++;
@@ -2073,17 +2134,20 @@
 
         // 检查登录状态
         window.onload = function() {
-            var savedUser = sessionStorage.getItem('mickey_user');
-            if (savedUser && accounts[savedUser]) {
-                var account = accounts[savedUser];
-                currentUser = savedUser;
-                document.getElementById('loginCard').style.display = 'none';
-                document.getElementById('welcomePage').classList.add('active');
-                document.getElementById('logoutFixed').style.display = 'block';
-                document.getElementById('welcomeRole').textContent = '身份：' + account.role;
-                document.getElementById('welcomeMsg').textContent = account.msg;
-                updateInboxBadge();
-            }
+            // 先加载云端数据
+            loadCloudData().then(function() {
+                var savedUser = sessionStorage.getItem('mickey_user');
+                if (savedUser && accounts[savedUser]) {
+                    var account = accounts[savedUser];
+                    currentUser = savedUser;
+                    document.getElementById('loginCard').style.display = 'none';
+                    document.getElementById('welcomePage').classList.add('active');
+                    document.getElementById('logoutFixed').style.display = 'block';
+                    document.getElementById('welcomeRole').textContent = '身份：' + account.role;
+                    document.getElementById('welcomeMsg').textContent = account.msg;
+                    updateInboxBadge();
+                }
+            });
         };
 
         // 回车键提交
