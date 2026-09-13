@@ -1060,6 +1060,97 @@
         }
         .inbox-badge.hide { display: none; }
 
+        /* 右上角消息图标 */
+        .msg-icon {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 48px;
+            height: 48px;
+            background: rgba(255,255,255,0.25);
+            border: 2px solid rgba(255,255,255,0.6);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 999;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+        }
+        .msg-icon:hover {
+            background: rgba(255,255,255,0.4);
+            transform: scale(1.1);
+        }
+        .msg-icon .msg-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            min-width: 20px;
+            height: 20px;
+            line-height: 20px;
+            padding: 0 5px;
+            background: #ff4757;
+            color: white;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            border: 2px solid rgba(255,71,87,0.3);
+            display: none;
+        }
+        .msg-icon .msg-badge.show { display: block; }
+        .msg-icon .msg-badge.pop {
+            animation: msgPop 0.5s ease;
+        }
+        @keyframes msgPop {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.4); }
+            100% { transform: scale(1); }
+        }
+
+        /* 新消息提示弹窗 */
+        .msg-toast {
+            position: fixed;
+            top: 75px;
+            right: 20px;
+            width: 300px;
+            max-width: 90vw;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 15px 18px;
+            z-index: 1000;
+            display: none;
+            border-left: 4px solid #ff4757;
+        }
+        .msg-toast.show { display: block; }
+        .msg-toast .mt-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #ff4757;
+            margin-bottom: 6px;
+        }
+        .msg-toast .mt-content {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.5;
+        }
+        .msg-toast .mt-close {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            font-size: 18px;
+            color: #ccc;
+            cursor: pointer;
+        }
+        .msg-toast .mt-close:hover { color: #ff4757; }
+
         .weekend-card {
             background: linear-gradient(135deg, #fff5f5, #fff);
             border: 2px solid #ffe0e0;
@@ -1451,11 +1542,6 @@
                 <button class="option-btn" onclick="showSubPage('mediationPage')">
                     <span class="opt-icon">⚖️</span>
                     <span class="opt-text">矛盾调解 😤🤗</span>
-                    <span class="opt-arrow">›</span>
-                </button>
-                <button class="option-btn" onclick="showInbox()">
-                    <span class="opt-icon">📬</span>
-                    <span class="opt-text">提醒收件箱<span class="inbox-badge hide" id="inboxBadge">0</span></span>
                     <span class="opt-arrow">›</span>
                 </button>
                 <button class="option-btn" onclick="showSubPage('invitePage')">
@@ -2192,9 +2278,11 @@
                     document.getElementById('loginCard').style.display = 'none';
                     document.getElementById('welcomePage').classList.add('active');
                     document.getElementById('logoutFixed').style.display = 'block';
+                    document.getElementById('msgIcon').style.display = 'flex';
                     document.getElementById('welcomeRole').textContent = '身份：' + account.role;
                     document.getElementById('welcomeMsg').textContent = account.msg;
                     updateInboxBadge();
+                    startPolling();
 
                     // 保存登录状态
                     sessionStorage.setItem('mickey_user', username);
@@ -2222,6 +2310,7 @@
             backToWelcome();
             document.getElementById('welcomePage').classList.remove('active');
             document.getElementById('logoutFixed').style.display = 'none';
+            document.getElementById('msgIcon').style.display = 'none';
             document.getElementById('loginCard').style.display = 'block';
             document.getElementById('username').value = '';
             document.getElementById('password').value = '';
@@ -2747,19 +2836,60 @@
             });
         }
 
+        var lastUnreadCount = 0;
+
         function updateInboxBadge() {
             var reminders = cloudGetReminders(currentUser);
             var unread = 0;
+            var latestMsg = null;
             for (var i = 0; i < reminders.length; i++) {
-                if (!reminders[i].read) unread++;
+                if (!reminders[i].read) {
+                    unread++;
+                    if (!latestMsg) latestMsg = reminders[i];
+                }
             }
-            var badge = document.getElementById('inboxBadge');
+            var badge = document.getElementById('msgBadge');
+            var icon = document.getElementById('msgIcon');
             if (unread > 0) {
                 badge.textContent = unread;
-                badge.classList.remove('hide');
+                badge.classList.add('show');
+                if (unread > lastUnreadCount) {
+                    badge.classList.remove('pop');
+                    void badge.offsetWidth;
+                    badge.classList.add('pop');
+                    showMsgToast(latestMsg);
+                }
             } else {
-                badge.classList.add('hide');
+                badge.classList.remove('show');
             }
+            lastUnreadCount = unread;
+        }
+
+        function showMsgToast(msg) {
+            if (!msg) return;
+            var toast = document.getElementById('msgToast');
+            var content = document.getElementById('msgToastContent');
+            var text = '来自：' + msg.from;
+            if (msg.catLabel) text += ' · ' + msg.catLabel;
+            text += '<br>' + (msg.planText || '').replace(/\n/g, '<br>');
+            content.innerHTML = text;
+            toast.classList.add('show');
+            setTimeout(function() { closeMsgToast(); }, 5000);
+        }
+
+        function closeMsgToast() {
+            document.getElementById('msgToast').classList.remove('show');
+        }
+
+        // 轮询检查新消息
+        var pollTimer = null;
+        function startPolling() {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(function() {
+                loadCloudData().then(function() {
+                    updateInboxBadge();
+                });
+            }, 15000);
         }
 
         // 检查登录状态
@@ -2773,9 +2903,11 @@
                     document.getElementById('loginCard').style.display = 'none';
                     document.getElementById('welcomePage').classList.add('active');
                     document.getElementById('logoutFixed').style.display = 'block';
+                    document.getElementById('msgIcon').style.display = 'flex';
                     document.getElementById('welcomeRole').textContent = '身份：' + account.role;
                     document.getElementById('welcomeMsg').textContent = account.msg;
                     updateInboxBadge();
+                    startPolling();
                 }
             });
         };
