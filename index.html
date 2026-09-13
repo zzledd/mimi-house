@@ -1492,6 +1492,11 @@
                     <span class="opt-text">提醒收件箱<span class="inbox-badge hide" id="inboxBadge">0</span></span>
                     <span class="opt-arrow">›</span>
                 </button>
+                <button class="option-btn" onclick="showSubPage('invitePage')">
+                    <span class="opt-icon">🍴</span>
+                    <span class="opt-text">邀请小两口吃饭吧 🥢😊</span>
+                    <span class="opt-arrow">›</span>
+                </button>
             </div>
         </div>
         <!-- 第二页：家庭菜谱 -->
@@ -1673,6 +1678,31 @@
         <button class="back-btn" onclick="backToWelcome()">‹ 返回主页</button>
     </div>
 
+    <!-- 子页面：邀请小两口吃饭 -->
+    <div class="sub-page" id="invitePage">
+        <div class="sub-page-icon">🍴</div>
+        <h1 class="sub-page-title">邀请小两口吃饭吧 🥢😊</h1>
+        <div class="sub-page-content">
+            <p style="text-align:center;color:#ff4757;font-weight:bold;font-size:18px;margin-bottom:15px;">填一下信息，通知小两口来吃饭~</p>
+            <div class="recipe-add-area">
+                <input type="text" id="inviteDate" placeholder="哪天来？比如：9月20日" />
+                <input type="text" id="inviteLocation" placeholder="在哪吃？比如：家里 / 某餐厅" />
+                <textarea id="inviteMenu" placeholder="准备了什么菜？比如：红烧肉、清蒸鱼、番茄蛋汤..." style="min-height:80px;"></textarea>
+                <div class="recipe-cat-select">
+                    <div class="recipe-cat-btn selected" onclick="selectInviteTarget(this,'19196941127')">老公</div>
+                    <div class="recipe-cat-btn" onclick="selectInviteTarget(this,'18584199490')">老婆</div>
+                    <div class="recipe-cat-btn selected" onclick="selectInviteTarget(this,'19196941127,18584199490')">小两口都要</div>
+                </div>
+                <button class="recipe-add-btn" onclick="sendInvite()">发送邀请</button>
+                <div class="reminder-tip" id="inviteTip"></div>
+            </div>
+            <!-- 已发送的邀请 -->
+            <p style="text-align:center;color:#ff4757;font-weight:bold;font-size:16px;margin:20px 0 10px;">📋 邀请记录</p>
+            <div class="date-list" id="inviteList"></div>
+        </div>
+        <button class="back-btn" onclick="backToWelcome()">‹ 返回主页</button>
+    </div>
+
     <!-- 提醒收件箱子页面 -->
     <div class="sub-page" id="inboxPage">
         <div class="sub-page-icon">📬</div>
@@ -1684,6 +1714,101 @@
     </div>
 
     <script>
+        // ==================== 邀请小两口吃饭 ====================
+        var currentInviteTarget = '19196941127,18584199490';
+        function selectInviteTarget(btn, target) {
+            currentInviteTarget = target;
+            var btns = document.querySelectorAll('#invitePage .recipe-cat-btn');
+            for (var i = 0; i < btns.length; i++) btns[i].classList.remove('selected');
+            btn.classList.add('selected');
+        }
+        function sendInvite() {
+            var date = document.getElementById('inviteDate').value.trim();
+            var location = document.getElementById('inviteLocation').value.trim();
+            var menu = document.getElementById('inviteMenu').value.trim();
+            if (!date) { alert('请填写日期~'); return; }
+            if (!location) { alert('请填写地点~'); return; }
+            if (!menu) { alert('请填写准备了什么菜~'); return; }
+            var account = accounts[currentUser];
+            var senderRole = account ? account.role : '未知';
+            var now = new Date();
+            var timeStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2,'0') + '-' + now.getDate().toString().padStart(2,'0') + ' ' + now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+            var invite = {
+                id: 'invite_' + now.getTime(),
+                from: senderRole,
+                fromUser: currentUser,
+                date: date,
+                location: location,
+                menu: menu,
+                time: timeStr
+            };
+            // 存到云端
+            if (!cloudData.invites) cloudData.invites = [];
+            cloudData.invites.unshift(invite);
+            // 给目标发提醒
+            var targets = currentInviteTarget.split(',');
+            for (var i = 0; i < targets.length; i++) {
+                var tuser = targets[i].trim();
+                if (!tuser) continue;
+                var list = cloudGetReminders(tuser);
+                list.unshift({
+                    id: invite.id + '_' + i,
+                    from: senderRole,
+                    fromUser: currentUser,
+                    dateKey: '',
+                    catLabel: '邀请吃饭 🍴',
+                    planText: date + ' 在' + location + '\n菜单：' + menu,
+                    time: timeStr,
+                    read: false
+                });
+                cloudSetReminders(tuser, list);
+            }
+            saveCloudData().then(function() {
+                document.getElementById('inviteDate').value = '';
+                document.getElementById('inviteLocation').value = '';
+                document.getElementById('inviteMenu').value = '';
+                var tip = document.getElementById('inviteTip');
+                tip.textContent = '✓ 邀请已发送给小两口！';
+                tip.classList.add('show');
+                setTimeout(function() { tip.classList.remove('show'); }, 3000);
+                renderInvites();
+                updateInboxBadge();
+            });
+        }
+        function renderInvites() {
+            var list = document.getElementById('inviteList');
+            if (!list) return;
+            list.innerHTML = '';
+            var invites = cloudData.invites || [];
+            if (invites.length === 0) {
+                list.innerHTML = '<p style="text-align:center;color:#aaa;font-size:15px;padding:20px 0;">还没有邀请记录~</p>';
+                return;
+            }
+            for (var i = 0; i < invites.length; i++) {
+                var inv = invites[i];
+                var canDelete = (inv.fromUser === currentUser);
+                var item = document.createElement('div');
+                item.className = 'recipe-item';
+                item.innerHTML =
+                    '<div class="ri-header"><span class="ri-name">' + inv.date + ' · ' + inv.location + '</span><span class="ri-cat">来自' + inv.from + '</span></div>' +
+                    '<div class="ri-content">' + inv.menu + '</div>' +
+                    '<div class="ri-footer"><span class="ri-author">' + inv.time + '</span>' +
+                    (canDelete ? '<span class="ri-delete" onclick="deleteInvite(\'' + inv.id + '\')">删除</span>' : '') + '</div>';
+                list.appendChild(item);
+            }
+        }
+        function deleteInvite(id) {
+            if (!confirm('确定删除这条邀请吗？')) return;
+            if (!cloudData.invites) return;
+            for (var i = 0; i < cloudData.invites.length; i++) {
+                if (cloudData.invites[i].id === id) {
+                    cloudData.invites.splice(i, 1);
+                    break;
+                }
+            }
+            saveCloudData().then(function() { renderInvites(); });
+        }
+
         // ==================== 分页导航 ====================
         function switchPage(num) {
             var tabs = document.querySelectorAll('.page-tab');
