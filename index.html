@@ -2912,25 +2912,109 @@
                 list.innerHTML = '<p style="text-align:center;color:#aaa;font-size:15px;padding:30px 0;">暂无提醒消息~</p>';
                 return;
             }
+            var foodCats = {'在家吃':'home','开荤':'meat','下馆子！':'out'};
+            var wkCats = {'异地微度假':'trip','就在遂宁':'local'};
             for (var i = 0; i < reminders.length; i++) {
                 var r = reminders[i];
                 var item = document.createElement('div');
                 item.className = 'inbox-item' + (r.read ? ' read' : ' unread');
                 var readBtn = r.read
                     ? '<button class="ii-read-btn" disabled>已阅览</button>'
-                    : '<button class="ii-read-btn" onclick="markReminderRead(\'' + r.id + '\')">阅览</button>';
-                // 找到日期对应的计划标题
-                var parts = r.dateKey.split('-');
-                var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                    : '<button class="ii-read-btn" onclick="event.stopPropagation();markReminderRead(\'' + r.id + '\')">阅览</button>';
+                // 日期处理
+                var dateInfo = '';
+                if (r.dateKey) {
+                    var parts = r.dateKey.split('-');
+                    var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                    dateInfo = (d.getMonth()+1) + '月' + d.getDate() + '日';
+                }
                 var catText = r.catLabel ? (' · ' + r.catLabel) : '';
                 var planType = r.catLabel ? '的计划' : '的吃饭计划';
+                // 判断是否可跳转
+                var canJump = r.dateKey && (r.catLabel || '').length > 0;
+                if (canJump) {
+                    item.style.cursor = 'pointer';
+                    item.onclick = (function(reminder) {
+                        return function() { jumpToPlan(reminder); };
+                    })(r);
+                }
+                var jumpTag = canJump ? ' <span style="color:#54a0ff;font-size:13px;">点击查看详情 ›</span>' : '';
                 item.innerHTML =
                     '<div class="ii-header"><span class="ii-from">来自：' + r.from + '</span><span class="ii-time">' + r.time + '</span></div>' +
-                    '<div class="ii-content">📅 ' + (d.getMonth()+1) + '月' + d.getDate() + '日' + planType + catText + '</div>' +
+                    '<div class="ii-content">📅 ' + (dateInfo || '邀请') + planType + catText + jumpTag + '</div>' +
                     '<div class="ii-plan">' + r.planText + '</div>' +
                     readBtn;
                 list.appendChild(item);
             }
+        }
+
+        function markReminderRead(reminderId) {
+
+        // 从收件箱跳转到对应日期的计划详情
+        function jumpToPlan(reminder) {
+            var foodCats = {'在家吃':'home','开荤':'meat','下馆子！':'out'};
+            var wkCats = {'异地微度假':'trip','就在遂宁':'local'};
+            var cat = '';
+            var isWeekend = false;
+            if (foodCats[reminder.catLabel]) {
+                cat = foodCats[reminder.catLabel];
+            } else if (wkCats[reminder.catLabel]) {
+                cat = wkCats[reminder.catLabel];
+                isWeekend = true;
+            } else {
+                return; // 无法识别的分类，不跳转
+            }
+
+            // 关闭收件箱
+            document.getElementById('inboxPage').classList.remove('active');
+
+            // 找到日期对应的周
+            buildWeeksData();
+            var weekIndex = -1;
+            for (var w = 0; w < weeksData.length; w++) {
+                for (var d = 0; d < weeksData[w].days.length; d++) {
+                    if (getDateKey(weeksData[w].days[d]) === reminder.dateKey) {
+                        weekIndex = w;
+                        break;
+                    }
+                }
+                if (weekIndex >= 0) break;
+            }
+            if (weekIndex < 0) {
+                alert('该日期已不在本年度范围内~');
+                return;
+            }
+
+            // 打开对应页面
+            if (isWeekend) {
+                catPrefix = 'wk';
+                planPrefix = 'mickey_plan_weekend_';
+                planLabel = '周末';
+                weekendOnly = true;
+                document.getElementById('weekendPage').classList.add('active');
+                document.getElementById('wk_deniedView').style.display = 'none';
+            } else {
+                catPrefix = 'food';
+                planPrefix = 'mickey_plan_food_';
+                planLabel = '吃饭';
+                weekendOnly = false;
+                document.getElementById('foodPage').classList.add('active');
+            }
+
+            // 打开该周的日期列表
+            currentWeekIndex = weekIndex;
+            var week = weeksData[weekIndex];
+            var dispNum = week.displayNum || (weekIndex + 1);
+            el('dateListTitle').textContent = '第' + dispNum + '周 (' + formatDateCN(week.start) + ' - ' + formatDateCN(week.end) + ')';
+            catRenderDateList(weekIndex);
+            el('weekListView').style.display = 'none';
+            el('dateListView').style.display = 'block';
+
+            // 打开分类选择页
+            catOpenPlanEditor(reminder.dateKey);
+
+            // 直接打开对应分类的计划编辑
+            openCatPlan(cat);
         }
 
         function markReminderRead(reminderId) {
