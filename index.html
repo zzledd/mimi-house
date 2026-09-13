@@ -1458,9 +1458,6 @@
 
     <!-- 欢迎页面 -->
     <div class="welcome-page" id="welcomePage">
-        <div class="welcome-mickey">
-            <div class="head"></div>
-        </div>
         <h1 class="welcome-title">米奇妙妙屋</h1>
         <p class="welcome-role" id="welcomeRole"></p>
         <p class="welcome-msg" id="welcomeMsg"></p>
@@ -1496,6 +1493,11 @@
                 <button class="option-btn" onclick="showSubPage('invitePage')">
                     <span class="opt-icon">🍴</span>
                     <span class="opt-text">邀请小两口吃饭吧 🥢😊</span>
+                    <span class="opt-arrow">›</span>
+                </button>
+                <button class="option-btn" onclick="showSubPage('houseworkPage')">
+                    <span class="opt-icon">🧹</span>
+                    <span class="opt-text">家务安排 🧽💪</span>
                     <span class="opt-arrow">›</span>
                 </button>
             </div>
@@ -1716,6 +1718,35 @@
         <button class="back-btn" onclick="backToWelcome()">‹ 返回主页</button>
     </div>
 
+    <!-- 子页面：家务安排 -->
+    <div class="sub-page" id="houseworkPage">
+        <div class="sub-page-icon">🧹</div>
+        <h1 class="sub-page-title">家务安排 🧽💪</h1>
+        <div class="sub-page-content">
+            <p style="text-align:center;color:#ff4757;font-weight:bold;font-size:18px;margin-bottom:15px;">添加家务，分配给家人~</p>
+            <div class="recipe-add-area">
+                <input type="text" id="houseworkName" placeholder="家务名称，比如：拖地、洗碗、倒垃圾" />
+                <div class="recipe-cat-select">
+                    <div class="recipe-cat-btn" onclick="selectHouseworkAssign(this,'')">所有人</div>
+                    <div class="recipe-cat-btn" onclick="selectHouseworkAssign(this,'19196941127')">老公</div>
+                    <div class="recipe-cat-btn" onclick="selectHouseworkAssign(this,'18584199490')">老婆</div>
+                    <div class="recipe-cat-btn" onclick="selectHouseworkAssign(this,'13882501164')">周炫宇爸爸</div>
+                    <div class="recipe-cat-btn" onclick="selectHouseworkAssign(this,'13568738295')">周炫宇妈妈</div>
+                    <div class="recipe-cat-btn" onclick="selectHouseworkAssign(this,'11')">杜钰璇爸爸</div>
+                    <div class="recipe-cat-btn" onclick="selectHouseworkAssign(this,'18982501246')">杜钰璇妈妈</div>
+                </div>
+                <div class="recipe-cat-select">
+                    <div class="recipe-cat-btn selected" onclick="selectHouseworkFreq(this,'每天')">每天</div>
+                    <div class="recipe-cat-btn" onclick="selectHouseworkFreq(this,'每周')">每周</div>
+                    <div class="recipe-cat-btn" onclick="selectHouseworkFreq(this,'一次性')">一次性</div>
+                </div>
+                <button class="recipe-add-btn" onclick="addHousework()">添加家务</button>
+            </div>
+            <div class="date-list" id="houseworkList"></div>
+        </div>
+        <button class="back-btn" onclick="backToWelcome()">‹ 返回主页</button>
+    </div>
+
     <!-- 提醒收件箱子页面 -->
     <div class="sub-page" id="inboxPage">
         <div class="sub-page-icon">📬</div>
@@ -1727,6 +1758,100 @@
     </div>
 
     <script>
+        // ==================== 家务安排 ====================
+        var currentHouseworkAssign = '';
+        var currentHouseworkFreq = '每天';
+        var assignNames = {
+            '19196941127': '老公',
+            '18584199490': '老婆',
+            '13882501164': '周炫宇爸爸',
+            '13568738295': '周炫宇妈妈',
+            '11': '杜钰璇爸爸',
+            '18982501246': '杜钰璇妈妈'
+        };
+        function selectHouseworkAssign(btn, val) {
+            currentHouseworkAssign = val;
+            var btns = document.querySelectorAll('#houseworkPage .recipe-cat-btn');
+            var idx = 0;
+            for (var i = 0; i < btns.length; i++) {
+                if (i < 7) btns[i].classList.remove('selected');
+            }
+            btn.classList.add('selected');
+        }
+        function selectHouseworkFreq(btn, val) {
+            currentHouseworkFreq = val;
+            var btns = document.querySelectorAll('#houseworkPage .recipe-cat-btn');
+            for (var i = 7; i < btns.length; i++) btns[i].classList.remove('selected');
+            btn.classList.add('selected');
+        }
+        function addHousework() {
+            var name = document.getElementById('houseworkName').value.trim();
+            if (!name) { alert('请输入家务名称~'); return; }
+            var account = accounts[currentUser];
+            var author = account ? account.role : '未知';
+            var assignLabel = currentHouseworkAssign ? (assignNames[currentHouseworkAssign] || '未知') : '所有人';
+            var hw = {
+                id: 'hw_' + Date.now(),
+                name: name,
+                assign: currentHouseworkAssign,
+                assignLabel: assignLabel,
+                freq: currentHouseworkFreq,
+                author: author,
+                authorUser: currentUser,
+                done: false,
+                time: new Date().toLocaleString('zh-CN', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})
+            };
+            if (!cloudData.houseworks) cloudData.houseworks = [];
+            cloudData.houseworks.unshift(hw);
+            saveCloudData().then(function() {
+                document.getElementById('houseworkName').value = '';
+                renderHouseworks();
+            });
+        }
+        function deleteHousework(id) {
+            if (!confirm('确定删除这条家务吗？')) return;
+            if (!cloudData.houseworks) return;
+            for (var i = 0; i < cloudData.houseworks.length; i++) {
+                if (cloudData.houseworks[i].id === id) {
+                    cloudData.houseworks.splice(i, 1);
+                    break;
+                }
+            }
+            saveCloudData().then(function() { renderHouseworks(); });
+        }
+        function toggleHouseworkDone(id) {
+            if (!cloudData.houseworks) return;
+            for (var i = 0; i < cloudData.houseworks.length; i++) {
+                if (cloudData.houseworks[i].id === id) {
+                    cloudData.houseworks[i].done = !cloudData.houseworks[i].done;
+                    break;
+                }
+            }
+            saveCloudData().then(function() { renderHouseworks(); });
+        }
+        function renderHouseworks() {
+            var list = document.getElementById('houseworkList');
+            if (!list) return;
+            list.innerHTML = '';
+            var hws = cloudData.houseworks || [];
+            if (hws.length === 0) {
+                list.innerHTML = '<p style="text-align:center;color:#aaa;font-size:15px;padding:20px 0;">还没有家务安排，快来添加吧~</p>';
+                return;
+            }
+            for (var i = 0; i < hws.length; i++) {
+                var h = hws[i];
+                var canDelete = (h.authorUser === currentUser);
+                var item = document.createElement('div');
+                item.className = 'recipe-item' + (h.done ? ' has-plan' : '');
+                item.innerHTML =
+                    '<div class="ri-header"><span class="ri-name" style="' + (h.done ? 'text-decoration:line-through;color:#aaa;' : '') + '">' + (h.done ? '✓ ' : '') + h.name + '</span><span class="ri-cat">' + h.assignLabel + ' · ' + h.freq + '</span></div>' +
+                    '<div class="ri-footer"><span class="ri-author">' + h.author + ' · ' + h.time + '</span>' +
+                    '<span><span class="ri-delete" onclick="event.stopPropagation();toggleHouseworkDone(\'' + h.id + '\')" style="margin-right:12px;">' + (h.done ? '取消完成' : '标记完成') + '</span>' +
+                    (canDelete ? '<span class="ri-delete" onclick="event.stopPropagation();deleteHousework(\'' + h.id + '\')">删除</span>' : '') + '</span></div>';
+                list.appendChild(item);
+            }
+        }
+
         // ==================== 邀请小两口吃饭 ====================
         var currentInviteTarget = '19196941127,18584199490';
         function selectInviteTarget(btn, target) {
@@ -2206,6 +2331,8 @@
                     document.getElementById('med_deniedView').style.display = 'none';
                     document.getElementById('med_contentView').style.display = 'block';
                 }
+            } else if (pageId === 'houseworkPage') {
+                renderHouseworks();
             }
         }
 
