@@ -2002,11 +2002,25 @@
             }).then(function(r) { return r.json(); });
         }
 
+        // UTF-8安全的base64编码/解码
+        function utf8ToBase64(str) {
+            var bytes = new TextEncoder().encode(str);
+            var binary = '';
+            for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary);
+        }
+        function base64ToUtf8(b64) {
+            var binary = atob(b64);
+            var bytes = new Uint8Array(binary.length);
+            for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return new TextDecoder().decode(bytes);
+        }
+
         function loadCloudData() {
             return githubApi('GET', DATA_FILE + '?ref=' + GITHUB_BRANCH).then(function(resp) {
                 if (resp && resp.content) {
                     cloudDataSha = resp.sha;
-                    var decoded = atob(resp.content.replace(/\n/g, ''));
+                    var decoded = base64ToUtf8(resp.content.replace(/\n/g, ''));
                     cloudData = JSON.parse(decoded);
                     if (!cloudData.plans) cloudData.plans = {};
                     if (!cloudData.reminders) cloudData.reminders = {};
@@ -2018,7 +2032,7 @@
         }
 
         function saveCloudData() {
-            var content = btoa(unescape(encodeURIComponent(JSON.stringify(cloudData))));
+            var content = utf8ToBase64(JSON.stringify(cloudData));
             var body = {
                 message: 'update plans/reminders',
                 content: content,
