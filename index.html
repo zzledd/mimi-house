@@ -1518,6 +1518,16 @@
         <div class="mt-header">📬 新消息提醒</div>
         <div class="mt-content" id="msgToastContent"></div>
     </div>
+
+    <!-- 欢迎页面 -->
+    <div class="welcome-page" id="welcomePage">
+        <h1 class="welcome-title">米奇妙妙屋</h1>
+        <p class="welcome-role" id="welcomeRole"></p>
+        <p class="welcome-msg" id="welcomeMsg"></p>
+        <!-- 消息图标 -->
+        <div class="msg-icon" id="msgIcon" onclick="showInbox()">
+            <span class="msg-emoji">📬</span><span class="msg-text">消息</span><span class="msg-badge" id="msgBadge">0</span>
+        </div>
         <!-- 分页导航 -->
         <div class="page-tabs">
             <div class="page-tab active" id="tab1" onclick="switchPage(1)">第一页</div>
